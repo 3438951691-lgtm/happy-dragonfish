@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To Qing Liyin</title>
+    <style>
+        /* ================= 基础样式 ================= */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@900&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            /* 【蓝色色调】深邃蓝空背景 */
+            background: radial-gradient(circle at 50% 100%, #001f3f 0%, #000810 100%);
+            color: #fff;
+            font-family: 'Noto Serif SC', 'SimHei', serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* 画布 */
+        canvas {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1;
+        }
+
+        /* 音乐控制按钮 (隐形，靠点击触发) */
+        #music-trigger {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 999;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: opacity 1s;
+        }
+        #music-trigger span {
+            font-size: 1.5rem;
+            letter-spacing: 5px;
+            color: #00f0ff;
+            border: 1px solid #00f0ff;
+            padding: 15px 40px;
+            border-radius: 50px;
+            animation: pulse 1.5s infinite;
+        }
+
+        /* 顶部标题 */
+        .top-header {
+            position: absolute;
+            top: 30px;
+            width: 100%;
+            text-align: center;
+            z-index: 10;
+            pointer-events: none;
+            opacity: 0; /* 初始隐藏，点击后显示 */
+            transition: opacity 1s;
+        }
+        .top-header h1 {
+            font-size: 1rem;
+            letter-spacing: 10px;
+            color: rgba(135, 206, 235, 0.5); /* 天蓝色 */
+            text-transform: uppercase;
+            font-weight: 300;
+            text-shadow: 0 0 10px rgba(0, 191, 255, 0.5);
+        }
+
+        /* 底部提示 */
+        .ui-layer {
+            position: absolute;
+            bottom: 40px;
+            width: 100%;
+            text-align: center;
+            z-index: 10;
+            pointer-events: none;
+            transition: opacity 1s;
+            opacity: 0; /* 初始隐藏 */
+        }
+        .footer-tip {
+            font-size: 0.9rem;
+            color: rgba(135, 206, 235, 0.6);
+            letter-spacing: 4px;
+            animation: pulse 2s infinite;
+        }
+
+        /* ================= 相册容器 ================= */
+        .gallery-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 50;
+            background: #000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1.5s ease;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .gallery-container.active { opacity: 1; pointer-events: auto; }
+
+        .photo-frame {
+            width: 85%; max-width: 500px;
+            height: 70vh;
+            position: relative; overflow: hidden;
+            border: 1px solid rgba(0, 191, 255, 0.3);
+            box-shadow: 0 0 60px rgba(0, 191, 255, 0.15);
+            border-radius: 4px;
+        }
+        .photo-track {
+            display: flex; height: 100%;
+            transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .photo-item {
+            min-width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            background: black;
+        }
+        .photo-item img {
+            max-width: 100%; max-height: 100%;
+            width: auto; height: auto; object-fit: contain;
+        }
+        .final-caption {
+            position: absolute; bottom: 15%; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 30, 60, 0.4);
+            backdrop-filter: blur(5px);
+            padding: 10px 30px;
+            border: 1px solid rgba(135, 206, 235, 0.3);
+            border-radius: 50px;
+            color: #fff; font-size: 2rem; white-space: nowrap;
+            text-shadow: 0 0 20px rgba(0, 191, 255, 0.8);
+            animation: floatUp 2s ease forwards;
+        }
+
+        @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+        @keyframes floatUp { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+    </style>
+</head>
+<body>
+
+    <!-- 音乐播放器 (隐藏) -->
+    <audio id="bgm" loop>
+        <source src="bgm.mp3" type="audio/mpeg">
+        您的浏览器不支持音频播放。
+    </audio>
+
+    <!-- 启动遮罩 -->
+    <div id="music-trigger">
+        <span>点击开启回忆</span>
+    </div>
+
+    <div class="top-header" id="headerLayer">
+        <h1>For You</h1>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <div class="ui-layer" id="uiLayer">
+        <div class="footer-tip">
+            [ 按下空格键 · 开启相册 ]
+        </div>
+    </div>
+
+    <div class="gallery-container" id="galleryLayer">
+        <div class="photo-frame">
+            <div class="photo-track" id="photoTrack"></div>
+        </div>
+    </div>
+
+    <script>
+        // ================= 配置区域 =================
+        const photoList = [
+            '1.jpg', '2.jpg', '3.jpg', '4.jpg', '5.jpg', 
+            '6.jpg', '7.jpg', '8.jpg', '9.jpg', '10.jpg', 
+            '11.jpg', '12.jpg', '13.jpg', '14.jpg', '15.jpg'
+        ];
+        const finalMessage = "卿沥尹新年快乐！";
+        
+        // 【修改点1】文案变长了
+        const PARTICLE_TEXT = "卿沥尹天天开心"; 
+
+        // ================= 核心逻辑 =================
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+        let heartPoints = [];
+        let textPoints = [];
+        let mouse = { x: -5000, y: -5000 };
+        let isGalleryMode = false;
+        let mode = 'HEART';
+        let isStarted = false;
+
+        // 音乐启动逻辑
+        const triggerBtn = document.getElementById('music-trigger');
+        const bgm = document.getElementById('bgm');
+
+        triggerBtn.addEventListener('click', () => {
+            bgm.play(); // 播放音乐
+            triggerBtn.style.opacity = 0;
+            setTimeout(() => triggerBtn.style.display = 'none', 1000);
+            
+            // 显示界面
+            document.getElementById('headerLayer').style.opacity = 1;
+            document.getElementById('uiLayer').style.opacity = 1;
+            
+            isStarted = true;
+        });
+
+        // 1. 生成相册
+        function generateGallery() {
+            const track = document.getElementById('photoTrack');
+            let html = '';
+            photoList.forEach((src, idx) => {
+                const isLast = idx === photoList.length - 1;
+                const caption = isLast ? `<div class="final-caption">${finalMessage}</div>` : '';
+                html += `
+                    <div class="photo-item">
+                        <img src="${src}" onerror="this.style.display='none'">
+                        ${caption}
+                    </div>
+                `;
+            });
+            track.innerHTML = html;
+        }
+        generateGallery();
+
+        // 2. 初始化
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            calculatePoints();
+        }
+        window.addEventListener('resize', resize);
+
+        // ================= 关键算法：生成点位 =================
+
+        function getHeartPoint(t, r) {
+            const x = 16 * Math.pow(Math.sin(t), 3);
+            const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+            return {
+                x: (x * r) + width / 2,
+                y: (-y * r) + height / 2
+            };
+        }
+
+        function getTextPoints(text) {
+            const tCanvas = document.createElement('canvas');
+            const tCtx = tCanvas.getContext('2d');
+            tCanvas.width = width;
+            tCanvas.height = height;
+            
+            // 【修改点2】字体大小调整：因为字数变多了(7个字)，为了显示下，字号要小一点
+            // 0.8 是屏幕宽度的80%，除以字数
+            let fontSize = Math.min(width * 0.8 / text.length, 200);
+            
+            tCtx.font = `900 ${fontSize}px "Noto Serif SC", "SimHei", serif`;
+            tCtx.fillStyle = 'white';
+            tCtx.textAlign = 'center';
+            tCtx.textBaseline = 'middle';
+            tCtx.fillText(text, width / 2, height / 2);
+
+            const imageData = tCtx.getImageData(0, 0, width, height).data;
+            const points = [];
+            
+            // 【修改点3】采样步长 Step：从5改成3
+            // 步长越小，生成的粒子越密集，字就越清楚！
+            const step = 3; 
+
+            for (let y = 0; y < height; y += step) {
+                for (let x = 0; x < width; x += step) {
+                    const index = (y * width + x) * 4;
+                    if (imageData[index + 3] > 128) { 
+                        points.push({ x: x, y: y });
+                    }
+                }
+            }
+            return points;
+        }
+
+        function calculatePoints() {
+            heartPoints = [];
+            textPoints = [];
+            
+            const r = Math.min(width, height) * 0.012;
+            for(let i=0; i<1200; i++) { // 爱心粒子加多一点
+                heartPoints.push(getHeartPoint(i * 0.1, r));
+            }
+            
+            const rawText = getTextPoints(PARTICLE_TEXT);
+            // 文字粒子尽可能多保留，不用随机丢弃了
+            // 只要电脑不卡，有多少显示多少
+            textPoints = rawText; 
+        }
+
+        // ================= 粒子类 =================
+        class Particle {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                // 粒子稍微小一点点，这样密集起来才精致
+                this.size = Math.random() * 1.5 + 0.5;
+                
+                const colors = ['#00f0ff', '#0077be', '#ffffff', '#87ceeb', '#1e90ff'];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.ease = 0.05 + Math.random() * 0.05; 
+            }
+
+            update(target) {
+                let tx = target ? target.x : this.x;
+                let ty = target ? target.y : this.y;
+
+                const dx = mouse.x - this.x;
+                const dy = mouse.y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 100) {
+                    const angle = Math.atan2(dy, dx);
+                    const force = (100 - dist) / 100;
+                    tx -= Math.cos(angle) * 150 * force;
+                    ty -= Math.sin(angle) * 150 * force;
+                }
+
+                this.x += (tx - this.x) * this.ease;
+                this.y += (ty - this.y) * this.ease;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            // 【修改点4】粒子总量暴增！
+            // 为了填满7个字，我们需要大量粒子。
+            // 动态计算：文字需要多少点，我们就生成多少粒子
+            // 至少保证有 2000 个粒子在场上
+            const count = Math.max(textPoints.length, 2000);
+            
+            for(let i=0; i<count; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        setInterval(() => {
+            if (!isGalleryMode && isStarted) {
+                mode = mode === 'HEART' ? 'TEXT' : 'HEART';
+            }
+        }, 5000);
+
+        function animate() {
+            if (!isGalleryMode) {
+                ctx.fillStyle = 'rgba(0, 8, 16, 0.2)'; 
+                ctx.fillRect(0, 0, width, height);
+
+                // 根据当前模式选择目标点
+                // 如果是文字模式，确保每个点都有粒子去填充
+                const targets = mode === 'HEART' ? heartPoints : textPoints;
+
+                particles.forEach((p, i) => {
+                    // 循环取点，确保粒子够用
+                    const target = targets[i % targets.length];
+                    
+                    if (mode === 'HEART' && target) {
+                        const pulse = 1 + Math.sin(Date.now() * 0.002) * 0.02;
+                        const cx = width/2, cy = height/2;
+                        const px = cx + (target.x - cx) * pulse;
+                        const py = cy + (target.y - cy) * pulse;
+                        p.update({x: px, y: py});
+                    } else {
+                        // 如果目标点不存在（粒子多余了），就让它在原地待机或者随机飘
+                        p.update(target || {x: p.x, y: p.y});
+                    }
+                    
+                    p.draw();
+                });
+            }
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('mousemove', e => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        const trigger = () => {
+            if (isGalleryMode || !isStarted) return;
+            isGalleryMode = true;
+            
+            document.getElementById('headerLayer').style.opacity = 0;
+            document.getElementById('uiLayer').style.opacity = 0;
+            
+            const burst = () => {
+                ctx.clearRect(0,0,width,height);
+                document.getElementById('galleryLayer').classList.add('active');
+                startScroll();
+            };
+            requestAnimationFrame(burst);
+        };
+
+        window.addEventListener('keydown', e => { if (e.code === 'Space') trigger(); });
+        // 点击页面任意位置也能进入相册（在开启后）
+        document.body.addEventListener('click', (e) => {
+            // 防止点击启动按钮时触发相册
+            if(e.target.id !== 'music-trigger' && e.target.parentElement.id !== 'music-trigger') {
+                trigger();
+            }
+        });
+
+        function startScroll() {
+            const track = document.getElementById('photoTrack');
+            let index = 0;
+            const total = photoList.length;
+            setInterval(() => {
+                index = (index + 1) % total;
+                track.style.transform = `translateX(-${index * 100}%)`;
+            }, 2000);
+        }
+
+        // 启动流程
+        // 1. 先计算点位
+        resize();
+        // 2. 根据点位数量生成足够多的粒子
+        initParticles();
+        // 3. 开始动画循环
+        animate();
+
+    </script>
+</body>
+</html>
