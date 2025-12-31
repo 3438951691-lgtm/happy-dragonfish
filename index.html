@@ -276,6 +276,7 @@
         });
 
         enterBtn.addEventListener('click', () => {
+            document.querySelectorAll('audio').forEach(a => { a.pause(); a.currentTime = 0; a.volume = 0; });
             // 切换音乐
             audio1.pause();
             audio1.currentTime = 0;
@@ -344,6 +345,7 @@
     </script>
 </body>
 </html>
+
 
 
 
