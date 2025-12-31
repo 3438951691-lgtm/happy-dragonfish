@@ -226,11 +226,13 @@
                 const pos = this.points[index];
                 const node = document.createElement('div');
                 node.className = 'hex-node';
+                if (index === 0) node.style.boxShadow = '0 0 20px var(--eva-red), 0 0 30px var(--eva-red)';
                 node.innerHTML = `<div class="hex-shape"><div class="hex-core"></div></div>`;
                 node.style.left = pos.x+'%'; node.style.top = pos.y+'%';
                 node.onclick = (e) => {
                     e.stopPropagation(); if(node.classList.contains('active')) return;
                     node.classList.add('active');
+                    if (index === 0) node.style.boxShadow = 'none';
                     if(index===0) this.pilotInfo.style.opacity = 0.3;
                     this.showMsg(Config.wishes[index] || "SYNC COMPLETE", pos.x, pos.y);
                     const rate = Math.floor(((index+1)/this.points.length)*400);
@@ -340,4 +342,5 @@
     </script>
 </body>
 </html>
+
 
